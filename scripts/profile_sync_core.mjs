@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { validateProfileObservations } from "@live-agency-skills/source-provider-api";
+import { validateProfileObservations } from "@flair-agency/source-provider-api";
 
 export const PROFILE_TARGET_INPUT_KIND =
   "application/vnd.live-agency.creator-profile-targets+json";

@@ -1,0 +1,32 @@
+{
+  "name": "@flair-agency/creator-profile-sync",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    "./SKILL.md": "./SKILL.md",
+    "./scripts/profile_v2_dual_run": "./scripts/profile_v2_dual_run.mjs",
+    "./scripts/export_profile_targets": "./scripts/export_profile_targets.mjs",
+    "./scripts/profile_sync_core": "./scripts/profile_sync_core.mjs",
+    "./scripts/profile_lark_runtime": "./scripts/profile_lark_runtime.mjs",
+    "./scripts/compare_profile_v2_dual_run": "./scripts/compare_profile_v2_dual_run.mjs",
+    "./scripts/sync_profile_observations": "./scripts/sync_profile_observations.mjs",
+    "./scripts/resolve_profile_source": "./scripts/resolve_profile_source.mjs"
+  },
+  "files": [
+    "SKILL.md",
+    "scripts",
+    "references",
+    "agents",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@flair-agency/source-provider-api": "1.6.0",
+    "@flair-agency/cli-utils": "0.1.0",
+    "@live-agency-skills/lark-base-client": "2.0.0",
+    "@flair-agency/private-runtime-files": "1.0.0"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
