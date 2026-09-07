@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { validateProfileObservations } from "@flair-agency/provider-protocol/legacy";
+import { validateProfileObservations } from "../src/contracts.mjs";
 
 import {
   PROFILE_TARGET_INPUT_KIND,
@@ -392,4 +392,18 @@ test("includes an uploaded avatar in the new profile create for record-created f
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+
+test('recording validation retains destination identity independently of observation validation', async () => {
+  const { validateProfileObservations: validateObservation } = await import('@flair-agency/tiktok-web-provider/contracts/profile-observation');
+  const snapshot = observations();
+  delete snapshot.creators[0].creatorRecordId;
+  assert.equal(validateObservation(snapshot), snapshot);
+  assert.throws(() => validateProfileObservations(snapshot), /creatorRecordId is required/);
+  snapshot.creators[0].creatorRecordId = CREATOR_ID;
+  const second = { ...snapshot.creators[0], accountKey: 'synthetic.other' };
+  snapshot.creators.push(second); snapshot.rowCount++;
+  assert.equal(validateObservation(snapshot), snapshot);
+  assert.throws(() => validateProfileObservations(snapshot), /creatorRecordId is duplicated/);
 });
