@@ -11,8 +11,8 @@ import {
   readFromProvider,
   resolveProvider,
   validateProfileObservations,
-} from "@flair-agency/source-provider-api";
-import { readPrivateJson, writePrivateJson } from "@flair-agency/private-runtime-files";
+} from "@flair-agency/provider-protocol/legacy";
+import { readPrivateJson, writePrivateJson } from "@flair-agency/private-files";
 
 export function parseArgs(argv) {
   const args = { unattended: false };

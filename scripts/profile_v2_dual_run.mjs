@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { validateProfileObservations } from "@flair-agency/source-provider-api";
+import { validateProfileObservations } from "../src/contracts.mjs";
 
 import {
   normalizeAccountKey,

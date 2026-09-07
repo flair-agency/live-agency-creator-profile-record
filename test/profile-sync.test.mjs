@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { validateProfileObservations } from "@flair-agency/source-provider-api";
+import { validateProfileObservations } from "@flair-agency/provider-protocol/legacy";
 
 import {
   PROFILE_TARGET_INPUT_KIND,
