@@ -147,7 +147,7 @@ function input() {
   });
   return {
     version: 1,
-    skill: "creator-profile-sync",
+    skill: "live-agency-creator-profile-record",
     generatedAt: "2030-01-02T03:07:00.000Z",
     reviewedTargetManifest: targetManifest,
     paths: {

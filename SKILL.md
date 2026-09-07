@@ -1,9 +1,9 @@
 ---
-name: creator-profile-sync
+name: live-agency-creator-profile-record
 description: Prepare creator targets, validate normalized public-profile observations, and safely append follower, post, nickname, avatar, and feature-observation history to Lark Base. Use for reviewed profile refreshes; do not collect live history or fan-club metrics, update existing history, or delete records.
 ---
 
-# Sync creator public-profile observations
+# Record creator public-profile observations
 
 Append reviewed public-profile observations without embedding knowledge of the
 source service. The public core owns target selection, the normalized contract,

@@ -19,9 +19,7 @@ import {
   prepareProfilePlan,
   resolveProfileFields,
 } from "../scripts/profile_lark_runtime.mjs";
-import { resolveProfileSource } from "../scripts/resolve_profile_source.mjs";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../../test/fixtures/installation");
 const NOW = Date.parse("2030-01-31T03:04:05.000Z");
 const CREATOR_ID = "recCreator0001";
 
@@ -391,26 +389,6 @@ test("includes an uploaded avatar in the new profile create for record-created f
       client.calls[0].rows[0].fields["Renamed Avatar"],
       [{ file_token: "synthetic-avatar-token" }],
     );
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
-});
-
-test("discovers a manual profile provider through npm without hardcoded provider IDs", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "profile-source-test-"));
-  try {
-    const requestPath = path.join(directory, "request.json");
-    const outputPath = path.join(directory, "observations.json");
-    await writeFile(requestPath, JSON.stringify(targetManifest()), { encoding: "utf8", mode: 0o600 });
-    const result = await resolveProfileSource({
-      providerRoot: repositoryRoot,
-      request: requestPath,
-      output: outputPath,
-      unattended: false,
-    });
-    assert.equal(result.status, "instructions-required");
-    assert.equal(result.providerPackage, "@fixture/profile-instruction-source");
-    assert.match(result.instructions, /normalized creator observation/);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

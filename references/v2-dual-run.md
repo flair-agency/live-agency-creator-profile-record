@@ -51,7 +51,7 @@ belong in the comparison input.
 ```json
 {
   "version": 1,
-  "skill": "creator-profile-sync",
+  "skill": "live-agency-creator-profile-record",
   "generatedAt": "2030-01-02T03:04:05.000Z",
   "reviewedTargetManifest": {},
   "paths": {

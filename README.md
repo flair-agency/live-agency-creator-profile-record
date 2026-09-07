@@ -1,4 +1,4 @@
-# creator-profile-sync
+# live-agency-creator-profile-record
 
 Independent Skill repository. [SKILL.md](SKILL.md) owns its behavior and acceptance contract.
 

@@ -9,7 +9,7 @@ import {
   validateTargetManifest,
 } from "./profile_sync_core.mjs";
 
-const SKILL = "creator-profile-sync";
+const SKILL = "live-agency-creator-profile-record";
 const PATH_NAMES = ["v1", "v2"];
 
 function assertObject(value, label) {

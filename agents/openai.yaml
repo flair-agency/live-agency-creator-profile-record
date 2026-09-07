@@ -1,4 +1,4 @@
 interface:
-  display_name: "Creator profile sync"
+  display_name: "Creator profile record"
   short_description: "Safely append normalized public-profile observations"
-  default_prompt: "Use $creator-profile-sync to prepare a reviewed dry run from normalized creator public-profile observations, and apply only after I approve the exact plan hash, create count, and avatar-attachment count."
+  default_prompt: "Use $live-agency-creator-profile-record to prepare a reviewed dry run from normalized creator public-profile observations, and apply only after I approve the exact plan hash, create count, and avatar-attachment count."
