@@ -296,6 +296,17 @@ async function createInBatches(client, appToken, tableId, rows) {
   return created;
 }
 
+// Pure review material for the selected no-avatar create path. Applying still
+// requires the exact business plan approval and fresh checks below.
+export function buildProfileCreateRecords({ plan, bindings }) {
+  validateProfileSyncPlan(plan);
+  assert(!planIsBlocked(plan), "blocking issues prevent payload preparation");
+  assert(plan.operations.profileAttachExisting.length === 0
+    && plan.operations.profileCreates.every(item => item.avatar === null),
+  "no-avatar payload preparation cannot include attachment operations");
+  return plan.operations.profileCreates.map(item => profilePayload(item, bindings));
+}
+
 async function uploadAvatar(client, config, item) {
   if (!item.avatar) return null;
   await verifyAvatarFile(item.avatar);
