@@ -307,6 +307,16 @@ export function buildProfileCreateRecords({ plan, bindings }) {
   return plan.operations.profileCreates.map(item => profilePayload(item, bindings));
 }
 
+// Review templates keep local avatar metadata separate from server-issued tokens.
+export function buildProfileCreateIntentRows({ plan, bindings }) {
+  validateProfileSyncPlan(plan);
+  assert(!planIsBlocked(plan), "blocking issues prevent payload preparation");
+  assert(plan.operations.profileAttachExisting.length === 0, "existing-row attachments require a separate path");
+  return plan.operations.profileCreates.map(item => ({
+    ...profilePayload(item, bindings), avatar: structuredClone(item.avatar),
+  }));
+}
+
 async function uploadAvatar(client, config, item) {
   if (!item.avatar) return null;
   await verifyAvatarFile(item.avatar);
