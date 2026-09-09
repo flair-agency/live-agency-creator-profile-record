@@ -407,3 +407,27 @@ test('recording validation retains destination identity independently of observa
   assert.equal(validateObservation(snapshot), snapshot);
   assert.throws(() => validateProfileObservations(snapshot), /creatorRecordId is duplicated/);
 });
+
+test('M3 comparison-only and missing approval perform no mutation', async () => {
+ const client=fakeLarkClient();
+ const manifest=await exportProfileTargets({client,config,nowMs:NOW});
+ const {plan}=await prepareProfilePlan({client,config,manifest,observations:observations(),nowMs:NOW});
+ const result=await applyProfilePlan({client,config,reviewedPlan:plan});
+ assert.equal(result.dryRun,true);assert.equal(result.status,'ready');assert.equal(client.calls.length,0);
+ await assert.rejects(applyProfilePlan({client,config,reviewedPlan:plan,apply:true}),/expect-sha256/);
+ assert.equal(client.calls.length,0);
+});
+test('M3 target drift rejects reviewed plan before mutation', async () => {
+ const client=fakeLarkClient();const manifest=await exportProfileTargets({client,config,nowMs:NOW});
+ const {plan}=await prepareProfilePlan({client,config,manifest,observations:observations(),nowMs:NOW});
+ const original=client.listRecords;client.listRecords=async(...args)=>args[1]===config.creatorTableId?[]:original(...args);
+ const result=await applyProfilePlan({client,config,reviewedPlan:plan,apply:true,expectSha256:plan.planSha256,confirmProfileCreate:1,confirmProfileAttach:0});
+ assert.equal(result.status,'blocked');assert.equal(client.calls.length,0);
+});
+test('M3 lost create response reconciles once without resubmission', async () => {
+ const client=fakeLarkClient();const manifest=await exportProfileTargets({client,config,nowMs:NOW});
+ const {plan}=await prepareProfilePlan({client,config,manifest,observations:observations(),nowMs:NOW});
+ const original=client.batchCreate;client.batchCreate=async(...args)=>{await original(...args);throw new Error('synthetic response lost');};
+ const result=await applyProfilePlan({client,config,reviewedPlan:plan,apply:true,expectSha256:plan.planSha256,confirmProfileCreate:1,confirmProfileAttach:0});
+ assert.equal(result.verified,true);assert.equal(result.recoveredFromAmbiguousResponse,true);assert.equal(client.calls.length,1);
+});
