@@ -36,18 +36,25 @@ URLs, UI labels, parsing rules, or device procedures to this skill.
 An unattended run is allowed only when the provider manifest explicitly
 declares it. Authentication or human interaction stops an unattended run.
 
-## Version 2 migration dual run
+## Migration verification and route selection
 
-Until this Skill's version 2 route is separately approved, version 1 remains
-authoritative. For migration comparison only, read
-[references/v2-dual-run.md](references/v2-dual-run.md). Run the version 1 path
-and the Creator Scouting MCP profile-observation path against the same exact
-reviewed target manifest, prepare both destination dry-run plans, and compare
-them with `scripts/compare_profile_v2_dual_run.mjs`.
+Verify the explicitly selected installed workflow through its supported
+planning, approved execution and readback entry points. An MCP adapter is
+required only when the selected client route uses it. Package versions and
+manifest schema versions do not select a production route.
 
-The comparison never authorizes an apply, profile-write activation, scheduled-
-route switch, or version 1 retirement. Keep every comparison input and report
-owner-only and outside Git.
+Reuse applicable Provider evidence. Compare the same reviewed inputs with a
+verified existing route when available; otherwise use the business contract
+and independently established expected results. Keep synthetic checks distinct
+from real-destination verification. Neither comparison nor passing tests
+authorize an apply, profile-write activation, schedule switch or retirement of
+the active route. Preserve the selected recovery path until cutover acceptance.
+
+When specifically comparing or switching the legacy Creator Scouting MCP
+route, follow [references/v2-dual-run.md](references/v2-dual-run.md), including
+its same-manifest comparison and scheduled-route conditions. Those conditions
+do not require introducing that MCP route for another selected workflow.
+Keep comparison inputs and reports owner-only and outside Git.
 
 ## Target selection
 
@@ -109,6 +116,14 @@ For a new profile row, upload the avatar first and include its attachment token
 in the create payload. This lets record-created Lark flows observe nickname and
 avatar together. Use attachment append only to resume an otherwise exact
 existing row whose avatar is missing.
+
+For an explicitly selected client composition, use
+`buildProfileHistoryWritePayloads` from `scripts/profile_lark_runtime.mjs` to
+prepare the complete creates and existing-image-resume review payload. It keeps
+image metadata separate from server-issued tokens and supports at most 100 rows
+per operation. Bind all effects to the same reviewed plan through the selected
+destination Provider; do not omit image operations or silently split the plan.
+`applyProfilePlan` remains the approved execution and final-readback entry point.
 
 Use the Lark API for the approved mutation. The implementation batches
 compatible profile creates instead of issuing one create call per row. On a

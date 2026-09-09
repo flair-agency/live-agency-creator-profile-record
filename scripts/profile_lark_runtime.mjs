@@ -296,6 +296,39 @@ async function createInBatches(client, appToken, tableId, rows) {
   return created;
 }
 
+// Pure review material for the selected no-avatar create path. Applying still
+// requires the exact business plan approval and fresh checks below.
+export function buildProfileCreateRecords({ plan, bindings }) {
+  validateProfileSyncPlan(plan);
+  assert(!planIsBlocked(plan), "blocking issues prevent payload preparation");
+  assert(plan.operations.profileAttachExisting.length === 0
+    && plan.operations.profileCreates.every(item => item.avatar === null),
+  "no-avatar payload preparation cannot include attachment operations");
+  return plan.operations.profileCreates.map(item => profilePayload(item, bindings));
+}
+
+// Review templates keep local avatar metadata separate from server-issued tokens.
+export function buildProfileCreateIntentRows({ plan, bindings }) {
+  validateProfileSyncPlan(plan);
+  assert(!planIsBlocked(plan), "blocking issues prevent payload preparation");
+  assert(plan.operations.profileAttachExisting.length === 0, "existing-row attachments require a separate path");
+  return plan.operations.profileCreates.map(item => ({
+    ...profilePayload(item, bindings), avatar: structuredClone(item.avatar),
+  }));
+}
+
+// Complete mixed-plan review material; it preserves existing-image-first ordering.
+export function buildProfileHistoryWritePayloads({ plan, bindings }) {
+  validateProfileSyncPlan(plan);
+  assert(!planIsBlocked(plan), "blocking issues prevent payload preparation");
+  assert(plan.operations.profileCreates.length <= 100 && plan.operations.profileAttachExisting.length <= 100,
+    "selected profile composition supports one bounded batch per operation");
+  return {
+    creates: plan.operations.profileCreates.map(item => ({ ...profilePayload(item, bindings), avatar: structuredClone(item.avatar) })),
+    appendExisting: plan.operations.profileAttachExisting.map(item => ({ recordId: item.recordId, avatar: structuredClone(item.avatar) })),
+  };
+}
+
 async function uploadAvatar(client, config, item) {
   if (!item.avatar) return null;
   await verifyAvatarFile(item.avatar);
