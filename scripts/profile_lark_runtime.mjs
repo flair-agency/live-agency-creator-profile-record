@@ -317,6 +317,18 @@ export function buildProfileCreateIntentRows({ plan, bindings }) {
   }));
 }
 
+// Complete mixed-plan review material; it preserves existing-image-first ordering.
+export function buildProfileHistoryWritePayloads({ plan, bindings }) {
+  validateProfileSyncPlan(plan);
+  assert(!planIsBlocked(plan), "blocking issues prevent payload preparation");
+  assert(plan.operations.profileCreates.length <= 100 && plan.operations.profileAttachExisting.length <= 100,
+    "selected profile composition supports one bounded batch per operation");
+  return {
+    creates: plan.operations.profileCreates.map(item => ({ ...profilePayload(item, bindings), avatar: structuredClone(item.avatar) })),
+    appendExisting: plan.operations.profileAttachExisting.map(item => ({ recordId: item.recordId, avatar: structuredClone(item.avatar) })),
+  };
+}
+
 async function uploadAvatar(client, config, item) {
   if (!item.avatar) return null;
   await verifyAvatarFile(item.avatar);
