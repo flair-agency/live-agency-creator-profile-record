@@ -152,7 +152,13 @@ journal, change journal directories or resend the old review to bypass recovery.
 If environment generation, target identity, source correlation or timestamp mode
 changes, preserve the private artifacts and prepare again from the current
 selection. A failed Provider read is not an empty history: report the failure
-and use that Provider's private evidence/troubleshooting route. Do not silently
+and use that Provider's private evidence/troubleshooting route. Library errors
+and CLI stderr preserve `providerCode` and optional Provider-sanitized `details`;
+the CLI keeps the outer `PROFILE_ENVIRONMENT_FAILED` code. Preserve those
+diagnostics for the authorized operator. Older Providers may omit details;
+their absence does not make the read successful or justify guessing the cause.
+The Provider owns diagnostic sanitization and service-specific interpretation.
+A failed planning read produces no new plan artifact. Do not silently
 switch endpoints, credentials, environments or the legacy writer.
 
 A human can inspect the manifest and normalized observations, use the selected
