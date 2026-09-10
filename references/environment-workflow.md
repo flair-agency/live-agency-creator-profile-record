@@ -154,7 +154,10 @@ changes, preserve the private artifacts and prepare again from the current
 selection. A failed Provider read is not an empty history: report the failure
 and use that Provider's private evidence/troubleshooting route. Library errors
 and CLI stderr preserve `providerCode` and optional Provider-sanitized `details`;
-the CLI keeps the outer `PROFILE_ENVIRONMENT_FAILED` code. Preserve those
+the CLI keeps the outer `PROFILE_ENVIRONMENT_FAILED` code for planning failures.
+After a write, failed verification reads retain the same diagnostics through
+`PROFILE_WRITE_OUTCOME_UNRESOLVED`, with `uncertainWrite: true`; preserve the
+journal and verify without resending the write. Preserve those
 diagnostics for the authorized operator. Older Providers may omit details;
 their absence does not make the read successful or justify guessing the cause.
 The Provider owns diagnostic sanitization and service-specific interpretation.
