@@ -5,6 +5,20 @@ description: Prepare creator targets, validate normalized public-profile observa
 
 # Record creator public-profile observations
 
+## Selected environment planning
+
+When the user selects a saved Runtime environment, use
+[the environment workflow](references/environment-workflow.md). The user invokes
+this Skill; the Skill requests source and datastore capabilities from that
+environment. It does not discover concrete Providers or select credentials.
+This connection currently prepares targets, observations and a read-only plan.
+It has no apply operation. Keep its selected environment and generation with
+every handoff. Do not fall back from this route to the legacy writer below.
+
+The existing route below is retained for compatibility and comparison with
+explicitly selected legacy installations. Its successful tests do not establish
+production acceptance of the new environment connection.
+
 Append reviewed public-profile observations without embedding knowledge of the
 source service. The public core owns target selection, the normalized contract,
 destination-aware reconciliation, constrained creates, avatar verification,

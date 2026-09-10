@@ -431,3 +431,47 @@ test('M3 lost create response reconciles once without resubmission', async () =>
  const result=await applyProfilePlan({client,config,reviewedPlan:plan,apply:true,expectSha256:plan.planSha256,confirmProfileCreate:1,confirmProfileAttach:0});
  assert.equal(result.verified,true);assert.equal(result.recoveredFromAmbiguousResponse,true);assert.equal(client.calls.length,1);
 });
+
+test("normalized history preserves the complete legacy plan, hashes and stop reasons", async () => {
+  const { buildProfileSyncPlanFromHistory } = await import("../src/profile-plan.mjs");
+  const binding = bindings();
+  const observation = observations({ profile: {
+    avatar: { path: "/synthetic/avatar.png", name: "avatar.png", mimeType: "image/png", size: 1, sha256: "a".repeat(64) },
+    avatarStatus: "observed_exact",
+  } });
+  const normal = {
+    valid: true, recordId: "recHistory0001", creatorRecordId: CREATOR_ID,
+    timestampMs: NOW - 60_000, followerCount: 12300, recentPostCount30d: 8,
+    latestPostAtMs: Date.parse("2030-01-30T01:00:59.000Z"), nickname: "Synthetic Creator",
+    featureObservationJson: null,
+    avatarHashes: [],
+  };
+  // Use the same canonical nested JSON representation as the existing planner.
+  const { stableStringify } = await import("../scripts/profile_sync_core.mjs");
+  normal.featureObservationJson = stableStringify(featureData());
+  const raw = (row) => ({ record_id: row.recordId, fields: {
+    [binding.profile.creator.name]: [row.creatorRecordId],
+    [binding.profile.timestamp.name]: row.timestampMs,
+    [binding.profile.followerCount.name]: row.followerCount,
+    [binding.profile.recentPostCount30d.name]: row.recentPostCount30d,
+    [binding.profile.latestPostAt.name]: row.latestPostAtMs,
+    [binding.profile.nickname.name]: row.nickname,
+    [binding.profile.featureObservationData.name]: row.featureObservationJson,
+    [binding.profile.avatar.name]: row.avatarHashes.map(hash => ({ hash })),
+  } });
+  const applied = { ...normal, avatarHashes: ["a".repeat(64)] };
+  const other = { ...normal, recordId: "recHistory0002" };
+  const invalid = raw(normal);
+  invalid.fields[binding.profile.followerCount.name] = "invalid";
+  for (const [profileRecords, profileHistory] of [
+    [[], []],
+    [[raw(normal)], [normal]],
+    [[raw(applied)], [applied]],
+    [[raw(normal), raw(other)], [normal, other]],
+    [[invalid], [{ valid: false, recordId: normal.recordId, reasons: ["invalid_follower_count"] }]],
+  ]) {
+    const input = { manifest: targetManifest(), observations: observation, nowMs: NOW };
+    assert.deepEqual(buildProfileSyncPlanFromHistory({ ...input, profileHistory }),
+      await buildProfileSyncPlan({ ...input, profileRecords, bindings: binding, resolveAttachmentHash: async attachment => attachment.hash }));
+  }
+});
