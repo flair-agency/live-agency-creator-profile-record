@@ -34,7 +34,7 @@ jobs:
           node --input-type=module <<'JS'
           import fs from 'node:fs';
           const p = JSON.parse(fs.readFileSync('package.json'));
-          if (process.env.EXPECTED_SHA !== process.env.ACTUAL_SHA) throw Error('reviewed commit mismatch');
+          if (process.env.GITHUB_REF !== 'refs/heads/main' || process.env.EXPECTED_SHA !== process.env.ACTUAL_SHA) throw Error('reviewed commit mismatch');
           const exact = v => /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(v);
           const url = typeof p.repository === 'string' ? p.repository : p.repository?.url;
           if (!p.name?.startsWith('@flair-agency/') || !exact(p.version) || p.private === true || p.workspaces) throw Error('invalid publish identity');
@@ -74,6 +74,7 @@ jobs:
           const [p] = JSON.parse(fs.readFileSync('packed.json'));
           for (const f of p.files) if (/(^|\/)(node_modules|tmp|\.git)(\/|$)/.test(f.path)) throw Error(`forbidden payload ${f.path}`);
           fs.writeFileSync('archive-name.txt', p.filename);
+          fs.writeFileSync('publish-tag.txt', p.version.includes('-') ? 'next' : 'latest');
           JS
       - name: Verify installed archive before publication
         env:
@@ -119,7 +120,7 @@ jobs:
           } else if (response.status !== 404) throw Error(`package preflight failed (${response.status})`);
           JS
       - name: Publish inspected archive
-        run: npm publish "$(cat archive-name.txt)" --ignore-scripts --registry=https://npm.pkg.github.com
+        run: npm publish "$(cat archive-name.txt)" --tag "$(cat publish-tag.txt)" --ignore-scripts --registry=https://npm.pkg.github.com
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Verify private registry installation
@@ -138,6 +139,9 @@ jobs:
           const npm = (args, cwd) => execFileSync('npm', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
           const published = JSON.parse(npm(['view', `${p.name}@${p.version}`, '--json'], process.cwd()));
           if (published.dist.integrity !== packed.integrity) throw Error('published integrity differs from inspected archive');
+          const tag=fs.readFileSync('publish-tag.txt','utf8').trim();
+          const tags=JSON.parse(npm(['view',p.name,'dist-tags','--json'],process.cwd()));
+          if(tags[tag]!==p.version) throw Error('published tag differs');
           const response = await fetch(`https://api.github.com/orgs/flair-agency/packages/npm/${encodeURIComponent(p.name.split('/')[1])}`, { headers: { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: 'application/vnd.github+json' } });
           if (!response.ok) throw Error(`package readback failed (${response.status})`);
           const metadata = await response.json();
@@ -160,7 +164,7 @@ jobs:
             if (!file.startsWith(packageRoot + path.sep) || !fs.statSync(file).isFile()) throw Error('invalid installed export');
             if (/\.(mjs|js)$/.test(file)) { await import(pathToFileURL(file).href); importedModules++; }
           }
-          const receipt = { package: p.name, version: p.version, integrity: published.dist.integrity, visibility: metadata.visibility, declaredRepository: repository, verificationCommit: process.env.GITHUB_SHA, installedWithNpmCi: true, importedModules };
+          const receipt = { package: p.name, version: p.version, tag, integrity: published.dist.integrity, visibility: metadata.visibility, declaredRepository: repository, verificationCommit: process.env.GITHUB_SHA, installedWithNpmCi: true, importedModules };
           fs.writeFileSync('publication-receipt.json', JSON.stringify(receipt, null, 2));
           fs.copyFileSync(path.join(directory, 'package-lock.json'), 'registry-install-lock.json');
           console.log(JSON.stringify(receipt));

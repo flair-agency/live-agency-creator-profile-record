@@ -1,17 +1,10 @@
 {
   "name": "@flair-agency/creator-profile-record",
-  "version": "1.2.0",
+  "version": "2.0.0-m3.0",
   "type": "module",
   "license": "MIT",
   "exports": {
     "./SKILL.md": "./SKILL.md",
-    "./scripts/profile_v2_dual_run": "./scripts/profile_v2_dual_run.mjs",
-    "./scripts/export_profile_targets": "./scripts/export_profile_targets.mjs",
-    "./scripts/profile_sync_core": "./scripts/profile_sync_core.mjs",
-    "./scripts/profile_lark_runtime": "./scripts/profile_lark_runtime.mjs",
-    "./scripts/compare_profile_v2_dual_run": "./scripts/compare_profile_v2_dual_run.mjs",
-    "./scripts/sync_profile_observations": "./scripts/sync_profile_observations.mjs",
-    "./scripts/resolve_profile_source": "./scripts/resolve_profile_source.mjs",
     "./contracts": "./src/contracts.mjs",
     "./environment": "./src/profile-environment.mjs",
     "./execution": "./src/profile-execution.mjs",
@@ -20,8 +13,9 @@
   },
   "files": [
     "SKILL.md",
-    "scripts",
-    "references",
+    "scripts/profile_environment.mjs",
+    "references/environment-workflow.md",
+    "references/normalized-profile-observations.md",
     "agents",
     "LICENSE",
     "src"
@@ -29,9 +23,7 @@
   "dependencies": {
     "@flair-agency/provider-protocol": "1.0.0",
     "@flair-agency/cli-utils": "0.1.0",
-    "@flair-agency/lark-base-provider": "1.3.0",
-    "@flair-agency/private-files": "1.0.0",
-    "@flair-agency/tiktok-web-provider": "1.1.0"
+    "@flair-agency/private-files": "1.0.0"
   },
   "scripts": {
     "test": "node --test"
@@ -42,5 +34,17 @@
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
+  },
+  "devDependencies": {
+    "@flair-agency/lark-base-provider": "1.3.0",
+    "@flair-agency/tiktok-web-provider": "1.1.0"
+  },
+  "peerDependencies": {
+    "@flair-agency/live-agency-runtime": "2.0.0-m3.0"
+  },
+  "peerDependenciesMeta": {
+    "@flair-agency/live-agency-runtime": {
+      "optional": true
+    }
   }
 }

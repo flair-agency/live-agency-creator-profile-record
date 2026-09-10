@@ -1,6 +1,6 @@
 # Profile recording through a selected environment
 
-This is the proposed environment connection for the existing recording Skill.
+This is the environment connection for the recording Skill.
 It prepares and applies reviewed business plans. Service acquisition,
 field mapping, credentials and resource selection belong to the selected
 Providers. The Runtime supplies access to those Providers. The Skill owns the
@@ -165,5 +165,6 @@ The published legacy route and current environment installation remain recovery
 artifacts. This source addition does not register a host Skill, publish a package,
 activate a schedule or change production. Deployment requires compatible selected
 Runtime and read/write capability bindings, an explicitly authorized destination
-configuration, and separate installation/cutover acceptance. The retained legacy
-package dependencies do not authorize fallback from this new route.
+configuration, and separate installation/cutover acceptance. Version 2 excludes the old service-specific entry points from its archive and
+exports. Source comparisons retain them as development-only fixtures; use the
+unchanged version 1.2.0 installation for an explicitly selected legacy workflow.
