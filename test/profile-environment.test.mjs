@@ -113,7 +113,7 @@ test('generation drift and uncorrelated or failed replies cannot become a plan',
   await assert.rejects(prepareEnvironmentProfilePlan({ access: f.access, targets, observations, nowMs: NOW }), /selected scope or row contract/);
 });
 
-test('the new entry imports only neutral contracts and rejects apply', async () => {
+test('the new entry imports only neutral contracts and requires explicit execution inputs', async () => {
   // Inspect the reachable local import graph, including dynamic imports.
   const visited = new Set();
   async function inspect(url) {
@@ -128,6 +128,13 @@ test('the new entry imports only neutral contracts and rejects apply', async () 
   }
   await inspect(new URL('../scripts/profile_environment.mjs', import.meta.url));
   assert(visited.has(new URL('../src/profile-observation.mjs', import.meta.url).href));
-  assert.throws(() => parseArgs(['apply']), /no apply operation/);
+  assert.throws(() => parseArgs(['apply']), /environment is required/);
   assert.throws(() => parseArgs(['plan', '--apply', 'true']), /invalid option/);
+  const apply = ['apply', '--environment', '/private/environment.json', '--generation', 'a'.repeat(64),
+    '--review', '/private/review.json', '--output', '/private/result.json', '--expect-sha256', 'b'.repeat(64),
+    '--confirm-profile-create', '1', '--confirm-profile-attach', '0', '--approval-ref', 'synthetic-only',
+    '--journal-directory', '/private/journals'];
+  assert.equal(parseArgs(apply)['confirm-profile-create'], '1');
+  await assert.rejects(async () => parseArgs(apply.map(value => value === 'synthetic-only' ? ' ' : value)), /actual approval reference/);
+  assert.throws(() => parseArgs(apply.map(value => value === '1' ? '1.5' : value)), /nonnegative integer/);
 });
