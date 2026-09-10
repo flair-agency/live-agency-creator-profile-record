@@ -92,6 +92,11 @@ jobs:
           fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'archive-preflight', version: '1.0.0', private: true, dependencies: { [p.name]: `file:${archive}` } }));
           execFileSync('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund'], { cwd: root, stdio: 'inherit' });
           execFileSync('npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], { cwd: root, stdio: 'inherit' });
+          const standaloneLock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json')));
+          const forbidden = ['@flair-agency/live-agency-runtime', '@flair-agency/lark-base-provider', '@flair-agency/tiktok-web-provider'];
+          const installedNames = Object.keys(standaloneLock.packages ?? {}).map(key => key.slice(key.lastIndexOf('node_modules/') + 'node_modules/'.length));
+          if (forbidden.some(name => installedNames.includes(name)
+            || Object.hasOwn(standaloneLock.packages?.['']?.dependencies ?? {}, name))) throw Error('standalone Skill installed Runtime or concrete Provider');
           const directory = fs.realpathSync(path.join(root, 'node_modules', p.name));
           const installed = JSON.parse(fs.readFileSync(path.join(directory, 'package.json')));
           if (installed.name !== p.name || installed.version !== p.version) throw Error('archive identity differs');
@@ -153,6 +158,11 @@ jobs:
           npm(['install', '--ignore-scripts', '--no-audit', '--no-fund'], directory);
           fs.rmSync(path.join(directory, 'node_modules'), { recursive: true });
           npm(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], directory);
+          const standaloneLock = JSON.parse(fs.readFileSync(path.join(directory, 'package-lock.json')));
+          const forbidden = ['@flair-agency/live-agency-runtime', '@flair-agency/lark-base-provider', '@flair-agency/tiktok-web-provider'];
+          const installedNames = Object.keys(standaloneLock.packages ?? {}).map(key => key.slice(key.lastIndexOf('node_modules/') + 'node_modules/'.length));
+          if (forbidden.some(name => installedNames.includes(name)
+            || Object.hasOwn(standaloneLock.packages?.['']?.dependencies ?? {}, name))) throw Error('standalone Skill installed Runtime or concrete Provider');
           const installed = JSON.parse(fs.readFileSync(path.join(directory, 'node_modules', p.name, 'package.json')));
           if (installed.name !== p.name || installed.version !== p.version) throw Error('installed identity differs');
           const packageRoot = path.join(directory, 'node_modules', p.name);
