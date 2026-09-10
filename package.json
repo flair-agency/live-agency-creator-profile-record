@@ -12,7 +12,11 @@
     "./scripts/compare_profile_v2_dual_run": "./scripts/compare_profile_v2_dual_run.mjs",
     "./scripts/sync_profile_observations": "./scripts/sync_profile_observations.mjs",
     "./scripts/resolve_profile_source": "./scripts/resolve_profile_source.mjs",
-    "./contracts": "./src/contracts.mjs"
+    "./contracts": "./src/contracts.mjs",
+    "./environment": "./src/profile-environment.mjs",
+    "./execution": "./src/profile-execution.mjs",
+    "./profile-plan": "./src/profile-plan.mjs",
+    "./scripts/profile_environment": "./scripts/profile_environment.mjs"
   },
   "files": [
     "SKILL.md",

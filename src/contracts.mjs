@@ -1,4 +1,4 @@
-import { validateProfileObservations as validateObservation } from '@flair-agency/tiktok-web-provider/contracts/profile-observation';
+import { validateProfileObservations as validateObservation } from './profile-observation.mjs';
 
 // A recording request additionally binds observations to distinct destination records.
 export function validateProfileObservations(snapshot) {
