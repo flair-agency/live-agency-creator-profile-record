@@ -119,7 +119,8 @@ export async function main(argv = process.argv.slice(2)) {
     return result.result?.status === 'failed' || ['blocked', 'unresolved'].includes(result.status) ? 2 : 0;
   } catch (error) {
     console.error(JSON.stringify({ status: 'stopped', code: error.code ?? 'PROFILE_ENVIRONMENT_FAILED',
-      message: error.message, uncertainWrite: error.uncertainWrite === true }));
+      message: error.message, uncertainWrite: error.uncertainWrite === true,
+      ...(error.providerCode === undefined ? {} : { providerCode: error.providerCode, details: error.details }) }));
     return 2;
   }
 }

@@ -6,6 +6,11 @@ import { sha256Json, validateProfileSyncPlan, planIsBlocked } from './profile-pl
 const CAPABILITY = 'creator-profile-datastore-write/v1';
 const check = (ok, message) => { if (!ok) throw new TypeError(message); };
 const same = (a, b) => sha256Json(a) === sha256Json(b);
+// Read errors already contain only the selected Provider's sanitized diagnostics.
+const diagnostics = error => error.providerCode === undefined ? {} : {
+  providerCode: error.providerCode,
+  ...(error.details === undefined ? {} : { details: structuredClone(error.details) }),
+};
 const unsigned = (value, key) => Object.fromEntries(Object.entries(value).filter(([name]) => name !== key));
 
 function validatePlanningReceipt(access, receipt) {
@@ -122,7 +127,7 @@ export async function applyEnvironmentProfileWrite({ access, review, approval, a
       try { verification = await verifyEnvironmentProfileWrite({ access, review }); }
       catch (error) {
         await onEvent({ stage: 'readback-failed', reviewSha256: review.reviewSha256, code: error.code ?? 'READBACK_INCOMPLETE' });
-        throw Object.assign(new Error('write outcome unresolved; inspect journal and read back without resending'), { uncertainWrite: true, cause: error });
+        throw Object.assign(new Error('write outcome unresolved; inspect journal and read back without resending'), { uncertainWrite: true, cause: error, ...diagnostics(error) });
       }
       if (verification.verified) break;
     }
@@ -142,6 +147,6 @@ export async function applyEnvironmentProfileWrite({ access, review, approval, a
     // Includes durable-event failures after invocation: do not turn missing
     // evidence into a claim that no write occurred or make the old review retryable.
     throw Object.assign(new Error('write or its evidence is unresolved; preserve the journal and verify without resending'),
-      { code: 'PROFILE_WRITE_OUTCOME_UNRESOLVED', uncertainWrite: true, cause: error });
+      { code: 'PROFILE_WRITE_OUTCOME_UNRESOLVED', uncertainWrite: true, cause: error, ...diagnostics(error) });
   }
 }

@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdtemp, writeFile, access, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { validateProviderResult } from '@flair-agency/provider-protocol';
 import { prepareEnvironmentTargets, requestEnvironmentObservations,
@@ -46,7 +49,8 @@ function fixture() {
       } else {
         assert.equal(request.input.operation, 'read-profile-history');
         assert.deepEqual(request.input.creatorRecordIds, [B]);
-        result = envelope(request, state.failHistory ? { status: 'failed', error: { code: 'SYNTHETIC_READ_DENIED', message: 'denied' } }
+        result = envelope(request, state.failHistory ? { status: 'failed', error: { code: 'SYNTHETIC_READ_DENIED', message: 'private-provider-message',
+          ...(state.details === undefined ? {} : { details: state.details }) } }
           : { status: 'done', output: { profileHistory: state.wrongHistoryScope
             ? normalizedHistory.map(row => ({ ...row, creatorRecordId: A })) : normalizedHistory, timestampMode: 'observed-at' } });
       }
@@ -137,4 +141,158 @@ test('the new entry imports only neutral contracts and requires explicit executi
   assert.equal(parseArgs(apply)['confirm-profile-create'], '1');
   await assert.rejects(async () => parseArgs(apply.map(value => value === 'synthetic-only' ? ' ' : value)), /actual approval reference/);
   assert.throws(() => parseArgs(apply.map(value => value === '1' ? '1.5' : value)), /nonnegative integer/);
+});
+
+test('failed reads retain only correlated Provider diagnostics for library callers', async () => {
+  const f = fixture();
+  const targets = await prepareEnvironmentTargets({ access: f.access, limit: 1, nowMs: NOW });
+  f.state.failHistory = true;
+  for (const details of [undefined, { stage: 'history-fields', reasonCode: 'FIELD_TYPE_MISMATCH', fieldRole: 'profileCreator' },
+    { stage: 'history-records', reasonCode: 'UPSTREAM_REJECTED', upstreamCode: 12345 }]) {
+    f.state.details = details;
+    await assert.rejects(prepareEnvironmentProfilePlan({ access: f.access, targets, observations, nowMs: NOW }), error => {
+      assert(error instanceof TypeError);
+      assert.equal(error.providerCode, 'SYNTHETIC_READ_DENIED');
+      assert.deepEqual(error.details, details);
+      assert.equal(Object.hasOwn(error, 'details'), details !== undefined);
+      assert.doesNotMatch(error.message, /private-provider-message/);
+      assert.equal(error.cause, undefined);
+      return true;
+    });
+  }
+  f.state.corruptCorrelation = true;
+  await assert.rejects(prepareEnvironmentProfilePlan({ access: f.access, targets, observations, nowMs: NOW }), error => {
+    assert.match(error.message, /requestId/);
+    assert.equal(error.providerCode, undefined);
+    return true;
+  });
+});
+
+test('actual CLI stderr carries sanitized diagnostics and failed planning creates no artifact', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'profile-cli-diagnostics-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const f = fixture();
+  const targets = await prepareEnvironmentTargets({ access: f.access, limit: 1, nowMs: NOW });
+  for (const [name, value] of Object.entries({ targets, observations })) {
+    await writeFile(path.join(directory, `${name}.json`), JSON.stringify(value), { mode: 0o600 });
+  }
+  const details = { stage: 'history-records', reasonCode: 'UPSTREAM_REJECTED', upstreamCode: 12345 };
+  const runtime = path.join(directory, 'runtime.mjs');
+  await writeFile(runtime, `
+    export function createEnvironmentAccess() {
+      Date.now = () => ${NOW};
+      const selection = ${JSON.stringify(selection)};
+      return { selection, async invoke(request) {
+        const history = request.input.operation === 'read-profile-history';
+        const mode = process.env.SYNTHETIC_DIAGNOSTIC_MODE;
+        const payload = history && mode !== 'success'
+          ? { status: 'failed', error: { code: 'SYNTHETIC_READ_DENIED', message: 'private-provider-message',
+              cause: 'private-cause', request: 'private-request',
+              ...(mode === 'old' ? {} : { details: ${JSON.stringify(details)} }) } }
+          : { status: 'done', output: history
+              ? { profileHistory: ${JSON.stringify(normalizedHistory)}, timestampMode: 'observed-at' }
+              : { creators: ${JSON.stringify(creators)}, dueCreatorRecordIds: ${JSON.stringify(due)}, timestampMode: 'observed-at' } };
+        return { selection, binding: { bindingId: 'synthetic' }, result: {
+          requestId: request.requestId, capability: request.capability, version: request.version,
+          context: request.context, ...payload } };
+      } };
+    }
+  `);
+  const loader = path.join(directory, 'loader.mjs');
+  await writeFile(loader, `export async function resolve(specifier, context, nextResolve) {
+    if (specifier === '@flair-agency/live-agency-runtime/environment') return { url: ${JSON.stringify(new URL(`file://${runtime}`).href)}, shortCircuit: true };
+    return nextResolve(specifier, context);
+  }`);
+  for (const mode of ['detailed', 'old', 'success']) {
+    const output = path.join(directory, `${mode}.json`);
+    const child = spawnSync(process.execPath, ['--no-warnings', '--loader', loader,
+      new URL('../scripts/profile_environment.mjs', import.meta.url).pathname,
+      'plan', '--environment', path.join(directory, 'environment.json'), '--generation', selection.generation,
+      '--targets', path.join(directory, 'targets.json'), '--observations', path.join(directory, 'observations.json'), '--output', output],
+    { encoding: 'utf8', env: { ...process.env, SYNTHETIC_DIAGNOSTIC_MODE: mode } });
+    assert.equal(child.error, undefined);
+    if (mode === 'success') {
+      assert.equal(child.status, 0, child.stderr);
+      assert.equal(child.stderr, '');
+      const receipt = JSON.parse(await readFile(output, 'utf8'));
+      assert.equal(receipt.plan.summary.profileAlreadyAppliedCount, 1);
+      assert.equal(receipt.businessWorkflowVerified, false);
+    } else {
+      assert.equal(child.status, 2, child.stderr);
+      assert.equal(child.stdout, '');
+      const diagnostic = JSON.parse(child.stderr);
+      assert.equal(diagnostic.code, 'PROFILE_ENVIRONMENT_FAILED');
+      assert.equal(diagnostic.providerCode, 'SYNTHETIC_READ_DENIED');
+      assert.deepEqual(diagnostic.details, mode === 'old' ? undefined : details);
+      assert.doesNotMatch(child.stderr, /private-provider-message|private-cause|private-request/);
+      await assert.rejects(access(output), { code: 'ENOENT' });
+    }
+  }
+});
+
+test('actual apply CLI retains readback diagnostics without replaying an uncertain write', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'profile-cli-readback-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const f = fixture();
+  const targets = await prepareEnvironmentTargets({ access: f.access, limit: 1, nowMs: NOW });
+  await writeFile(path.join(directory, 'targets.json'), JSON.stringify(targets), { mode: 0o600 });
+  await writeFile(path.join(directory, 'observations.json'), JSON.stringify(observations), { mode: 0o600 });
+  const details = { stage: 'history-records', reasonCode: 'UPSTREAM_REJECTED', upstreamCode: 12345 };
+  const runtime = path.join(directory, 'runtime.mjs');
+  await writeFile(runtime, `
+    import { appendFileSync } from 'node:fs';
+    import { sha256Json } from ${JSON.stringify(new URL('../src/profile-plan.mjs', import.meta.url).href)};
+    export function createEnvironmentAccess() {
+      Date.now = () => ${NOW};
+      const selection = ${JSON.stringify(selection)};
+      let wrote = false;
+      return { selection, async invoke(request) {
+        const input = request.input;
+        let payload;
+        if (input.operation === 'prepare') {
+          const prepared = { selection, planSha256: input.planSha256, input, inputSha256: sha256Json(input),
+            counts: { create: 1, attach: 0, appendExisting: 0 } };
+          payload = { status: 'done', output: { ...prepared, intentSha256: sha256Json(prepared) } };
+        } else if (input.operation === 'apply') {
+          wrote = true;
+          appendFileSync(${JSON.stringify(path.join(directory, 'writes'))}, 'write\\n');
+          payload = { status: 'done', output: { createdRecordIds: ['recSyntheticCreated'], createCount: 1, attachCount: 0, appendExistingCount: 0 } };
+        } else if (wrote && input.operation === 'read-profile-history') {
+          payload = { status: 'failed', error: { code: 'SYNTHETIC_READ_DENIED', details: ${JSON.stringify(details)},
+            message: 'private-provider-message', cause: 'private-cause', request: 'private-request' } };
+        } else payload = { status: 'done', output: input.operation === 'read-creators'
+          ? { creators: ${JSON.stringify(creators)}, dueCreatorRecordIds: ${JSON.stringify(due)}, timestampMode: 'observed-at' }
+          : { profileHistory: [], timestampMode: 'observed-at' } };
+        return { selection, binding: { bindingId: 'synthetic' }, result: {
+          requestId: request.requestId, capability: request.capability, version: request.version, context: request.context, ...payload } };
+      } };
+    }
+  `);
+  const loader = path.join(directory, 'loader.mjs');
+  await writeFile(loader, `export async function resolve(specifier, context, nextResolve) {
+    if (specifier === '@flair-agency/live-agency-runtime/environment') return { url: ${JSON.stringify(new URL(`file://${runtime}`).href)}, shortCircuit: true };
+    return nextResolve(specifier, context);
+  }`);
+  const cli = (operation, output, args) => spawnSync(process.execPath, ['--no-warnings', '--loader', loader,
+    new URL('../scripts/profile_environment.mjs', import.meta.url).pathname, operation,
+    '--environment', path.join(directory, 'environment.json'), '--generation', selection.generation,
+    '--output', path.join(directory, output), ...args], { encoding: 'utf8' });
+  for (const child of [
+    cli('plan', 'plan.json', ['--targets', path.join(directory, 'targets.json'), '--observations', path.join(directory, 'observations.json')]),
+    cli('prepare-write', 'review.json', ['--plan', path.join(directory, 'plan.json')]),
+  ]) assert.equal(child.status, 0, child.stderr);
+  const review = JSON.parse(await readFile(path.join(directory, 'review.json'), 'utf8'));
+  const child = cli('apply', 'result.json', ['--review', path.join(directory, 'review.json'),
+    '--expect-sha256', review.planningReceipt.plan.planSha256, '--confirm-profile-create', '1',
+    '--confirm-profile-attach', '0', '--approval-ref', 'synthetic-only', '--journal-directory', path.join(directory, 'journal')]);
+  assert.equal(child.status, 2, child.stderr);
+  const diagnostic = JSON.parse(child.stderr);
+  assert.equal(diagnostic.code, 'PROFILE_WRITE_OUTCOME_UNRESOLVED');
+  assert.equal(diagnostic.uncertainWrite, true);
+  assert.equal(diagnostic.providerCode, 'SYNTHETIC_READ_DENIED');
+  assert.deepEqual(diagnostic.details, details);
+  assert.doesNotMatch(child.stderr, /private-provider-message|private-cause|private-request/);
+  assert.equal(await readFile(path.join(directory, 'writes'), 'utf8'), 'write\n');
+  assert.equal(child.stdout, '');
+  await assert.rejects(access(path.join(directory, 'result.json')), { code: 'ENOENT' });
 });

@@ -23,7 +23,15 @@ async function read(access, input) {
   const reply = await access.invoke(request);
   selected(access, reply.selection);
   validateProviderResult(reply.result, request);
-  check(reply.result.status === 'done', `profile read did not complete: ${reply.result.error?.code ?? reply.result.status}`);
+  if (reply.result.status !== 'done') {
+    const error = new TypeError(`profile read did not complete: ${reply.result.error?.code ?? reply.result.status}`);
+    if (reply.result.status === 'failed') {
+      error.providerCode = reply.result.error.code;
+      // The selected Provider owns sanitization; retain only its diagnostic fields.
+      if (reply.result.error.details !== undefined) error.details = structuredClone(reply.result.error.details);
+    }
+    throw error;
+  }
   return reply;
 }
 
