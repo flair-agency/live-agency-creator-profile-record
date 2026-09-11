@@ -94,7 +94,7 @@ export async function applyEnvironmentProfileWrite({ access, review, approval, a
   check(current.plan.planSha256 === plan.planSha256 && !planIsBlocked(current.plan), 'business plan changed; review the new plan');
   check(await authorize(review, approval) === true, 'business plan not authorized');
   await onEvent({ stage: 'approval-confirmed', reviewSha256: review.reviewSha256, selection: review.selection, approval });
-  let result, writeError, failureStage = null;
+  let result, writeError, writeFailure, failureStage = null;
   try {
     result = await invoke(access, { operation: 'apply', prepared: review.prepared }, {
       authorizeIntent: async intent => same(intent, review.prepared) && await authorize(review, approval) === true,
@@ -102,6 +102,9 @@ export async function applyEnvironmentProfileWrite({ access, review, approval, a
     });
     if (result.status !== 'done') {
       writeError = result.error?.code ?? result.status;
+      // The Provider owns sanitization. Keep its diagnostic envelope separate
+      // from a later readback failure; neither its message nor cause is retained.
+      writeFailure = diagnostics({ providerCode: writeError, details: result.error?.details });
       // Preserve only a small diagnostic value, never the private service payload.
       const stage = result.error?.details?.stage;
       failureStage = typeof stage === 'string' && /^[a-z-]{1,40}$/.test(stage) ? stage : null;
@@ -119,34 +122,41 @@ export async function applyEnvironmentProfileWrite({ access, review, approval, a
 
   try {
     await onEvent({ stage: 'write-call-returned', reviewSha256: review.reviewSha256,
-      writeError: writeError ?? null, failureStage, providerReportedUncertainWrite: result?.error?.details?.uncertainWrite === true });
+      writeError: writeError ?? null, failureStage, providerReportedUncertainWrite: result?.error?.details?.uncertainWrite === true,
+      ...(writeFailure === undefined ? {} : { writeFailure }) });
     // Retain the existing bounded readback sequence. Only reads may repeat.
     let verification;
     for (const delay of [0, 500, 1500, 3000]) {
       if (delay) await sleep(delay);
       try { verification = await verifyEnvironmentProfileWrite({ access, review }); }
       catch (error) {
-        await onEvent({ stage: 'readback-failed', reviewSha256: review.reviewSha256, code: error.code ?? 'READBACK_INCOMPLETE' });
-        throw Object.assign(new Error('write outcome unresolved; inspect journal and read back without resending'), { uncertainWrite: true, cause: error, ...diagnostics(error) });
+        const readbackFailure = diagnostics(error);
+        await onEvent({ stage: 'readback-failed', reviewSha256: review.reviewSha256,
+          code: error.code ?? 'READBACK_INCOMPLETE', readbackFailure });
+        throw Object.assign(new Error('write outcome unresolved; inspect journal and read back without resending'),
+          { uncertainWrite: true, cause: error, ...readbackFailure, readbackFailure });
       }
       if (verification.verified) break;
     }
     if (!verification?.verified) {
       await onEvent({ stage: 'unresolved', reviewSha256: review.reviewSha256, writeError: writeError ?? null });
       return { status: 'unresolved', verified: false, businessWorkflowVerified: false, reviewSha256: review.reviewSha256,
-        writeError: writeError ?? null, verification };
+        writeError: writeError ?? null, ...(writeFailure === undefined ? {} : { writeFailure }), verification };
     }
     const completed = { status: 'success', verified: true, businessWorkflowVerified: true, reviewSha256: review.reviewSha256,
       planSha256: plan.planSha256, profileCreatedCount: plan.summary.profileCreateCount,
       profileAttachedCount: plan.summary.profileAttachCount,
       profileVerifiedCount: verification.planningReceipt.plan.summary.profileAlreadyAppliedCount,
-      recoveredFromAmbiguousResponse: Boolean(writeError), verification };
+      recoveredFromAmbiguousResponse: Boolean(writeError),
+      ...(writeFailure === undefined ? {} : { writeFailure }), verification };
     await onEvent({ stage: 'business-verified', reviewSha256: review.reviewSha256, planSha256: plan.planSha256 });
     return completed;
   } catch (error) {
     // Includes durable-event failures after invocation: do not turn missing
     // evidence into a claim that no write occurred or make the old review retryable.
     throw Object.assign(new Error('write or its evidence is unresolved; preserve the journal and verify without resending'),
-      { code: 'PROFILE_WRITE_OUTCOME_UNRESOLVED', uncertainWrite: true, cause: error, ...diagnostics(error) });
+      { code: 'PROFILE_WRITE_OUTCOME_UNRESOLVED', uncertainWrite: true, cause: error, ...diagnostics(error),
+        ...(writeFailure === undefined ? {} : { writeFailure }),
+        ...(error.readbackFailure === undefined ? {} : { readbackFailure: error.readbackFailure }) });
   }
 }

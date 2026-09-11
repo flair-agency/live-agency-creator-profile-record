@@ -157,7 +157,17 @@ and CLI stderr preserve `providerCode` and optional Provider-sanitized `details`
 the CLI keeps the outer `PROFILE_ENVIRONMENT_FAILED` code for planning failures.
 After a write, failed verification reads retain the same diagnostics through
 `PROFILE_WRITE_OUTCOME_UNRESOLVED`, with `uncertainWrite: true`; preserve the
-journal and verify without resending the write. Preserve those
+journal and verify without resending the write. When the Provider returns a
+failed write, `writeFailure` retains its sanitized code and optional details in
+the journal and result. A later failed verification read has its own
+`readbackFailure`; the existing top-level read diagnostics remain available for
+older consumers. These are separate observations: a readback failure does not
+explain the earlier write failure or prove whether the write reached the service.
+If readback succeeds but the observation is absent, the result remains
+`unresolved`; inspect the retained write failure and prepare the missing remainder.
+Older Providers may supply only a write code, and thrown calls may supply no
+Provider diagnostic envelope. Do not infer a cause from missing diagnostics.
+Preserve those
 diagnostics for the authorized operator. Older Providers may omit details;
 their absence does not make the read successful or justify guessing the cause.
 The Provider owns diagnostic sanitization and service-specific interpretation.

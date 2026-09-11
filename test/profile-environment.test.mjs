@@ -230,7 +230,8 @@ test('actual CLI stderr carries sanitized diagnostics and failed planning create
   }
 });
 
-test('actual apply CLI retains readback diagnostics without replaying an uncertain write', async t => {
+for (const mode of ['acknowledged', 'failed-legacy', 'failed-diagnostic'])
+test(`actual apply CLI separates write and readback diagnostics without replay (${mode})`, async t => {
   const directory = await mkdtemp(path.join(tmpdir(), 'profile-cli-readback-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const f = fixture();
@@ -238,6 +239,11 @@ test('actual apply CLI retains readback diagnostics without replaying an uncerta
   await writeFile(path.join(directory, 'targets.json'), JSON.stringify(targets), { mode: 0o600 });
   await writeFile(path.join(directory, 'observations.json'), JSON.stringify(observations), { mode: 0o600 });
   const details = { stage: 'history-records', reasonCode: 'UPSTREAM_REJECTED', upstreamCode: 12345 };
+  const writeDetails = { stage: 'apply', reasonCode: 'SYNTHETIC_WRITE_INTERRUPTED', upstreamCode: 54321, uncertainWrite: true };
+  const writeReply = mode === 'acknowledged'
+    ? { status: 'done', output: { createdRecordIds: ['recSyntheticCreated'], createCount: 1, attachCount: 0, appendExistingCount: 0 } }
+    : { status: 'failed', error: { code: 'SYNTHETIC_WRITE_FAILED', message: 'private-provider-message',
+      cause: 'private-cause', request: 'private-request', ...(mode === 'failed-diagnostic' ? { details: writeDetails } : {}) } };
   const runtime = path.join(directory, 'runtime.mjs');
   await writeFile(runtime, `
     import { appendFileSync } from 'node:fs';
@@ -256,7 +262,7 @@ test('actual apply CLI retains readback diagnostics without replaying an uncerta
         } else if (input.operation === 'apply') {
           wrote = true;
           appendFileSync(${JSON.stringify(path.join(directory, 'writes'))}, 'write\\n');
-          payload = { status: 'done', output: { createdRecordIds: ['recSyntheticCreated'], createCount: 1, attachCount: 0, appendExistingCount: 0 } };
+          payload = ${JSON.stringify(writeReply)};
         } else if (wrote && input.operation === 'read-profile-history') {
           payload = { status: 'failed', error: { code: 'SYNTHETIC_READ_DENIED', details: ${JSON.stringify(details)},
             message: 'private-provider-message', cause: 'private-cause', request: 'private-request' } };
@@ -291,6 +297,15 @@ test('actual apply CLI retains readback diagnostics without replaying an uncerta
   assert.equal(diagnostic.uncertainWrite, true);
   assert.equal(diagnostic.providerCode, 'SYNTHETIC_READ_DENIED');
   assert.deepEqual(diagnostic.details, details);
+  assert.deepEqual(diagnostic.readbackFailure, { providerCode: 'SYNTHETIC_READ_DENIED', details });
+  const writeFailure = mode === 'acknowledged' ? undefined : { providerCode: 'SYNTHETIC_WRITE_FAILED',
+    ...(mode === 'failed-diagnostic' ? { details: writeDetails } : {}) };
+  assert.deepEqual(diagnostic.writeFailure, writeFailure);
+  const journal = await readFile(path.join(directory, 'journal', `${review.reviewSha256}.jsonl`), 'utf8');
+  const events = journal.trim().split('\n').map(line => JSON.parse(line).event);
+  assert.deepEqual(events.find(event => event.stage === 'write-call-returned').writeFailure, writeFailure);
+  assert.deepEqual(events.find(event => event.stage === 'readback-failed').readbackFailure, diagnostic.readbackFailure);
+  assert.doesNotMatch(journal, /private-provider-message|private-cause|private-request/);
   assert.doesNotMatch(child.stderr, /private-provider-message|private-cause|private-request/);
   assert.equal(await readFile(path.join(directory, 'writes'), 'utf8'), 'write\n');
   assert.equal(child.stdout, '');
