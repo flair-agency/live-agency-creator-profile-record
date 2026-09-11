@@ -120,7 +120,9 @@ export async function main(argv = process.argv.slice(2)) {
   } catch (error) {
     console.error(JSON.stringify({ status: 'stopped', code: error.code ?? 'PROFILE_ENVIRONMENT_FAILED',
       message: error.message, uncertainWrite: error.uncertainWrite === true,
-      ...(error.providerCode === undefined ? {} : { providerCode: error.providerCode, details: error.details }) }));
+      ...(error.providerCode === undefined ? {} : { providerCode: error.providerCode, details: error.details }),
+      ...(error.writeFailure === undefined ? {} : { writeFailure: error.writeFailure }),
+      ...(error.readbackFailure === undefined ? {} : { readbackFailure: error.readbackFailure }) }));
     return 2;
   }
 }
