@@ -161,7 +161,9 @@ journal and verify without resending the write. When the Provider returns a
 failed write, `writeFailure` retains its sanitized code and optional details in
 the journal and result. A later failed verification read has its own
 `readbackFailure`; the existing top-level read diagnostics remain available for
-older consumers. These are separate observations: a readback failure does not
+older consumers. If recording the readback failure also fails, the already-known
+write and readback diagnostics remain in the thrown result and CLI error output;
+the journal may be incomplete. These are separate observations: a readback failure does not
 explain the earlier write failure or prove whether the write reached the service.
 If readback succeeds but the observation is absent, the result remains
 `unresolved`; inspect the retained write failure and prepare the missing remainder.

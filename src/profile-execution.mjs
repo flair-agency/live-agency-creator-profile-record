@@ -94,7 +94,7 @@ export async function applyEnvironmentProfileWrite({ access, review, approval, a
   check(current.plan.planSha256 === plan.planSha256 && !planIsBlocked(current.plan), 'business plan changed; review the new plan');
   check(await authorize(review, approval) === true, 'business plan not authorized');
   await onEvent({ stage: 'approval-confirmed', reviewSha256: review.reviewSha256, selection: review.selection, approval });
-  let result, writeError, writeFailure, failureStage = null;
+  let result, writeError, writeFailure, readbackFailure, failureStage = null;
   try {
     result = await invoke(access, { operation: 'apply', prepared: review.prepared }, {
       authorizeIntent: async intent => same(intent, review.prepared) && await authorize(review, approval) === true,
@@ -130,7 +130,8 @@ export async function applyEnvironmentProfileWrite({ access, review, approval, a
       if (delay) await sleep(delay);
       try { verification = await verifyEnvironmentProfileWrite({ access, review }); }
       catch (error) {
-        const readbackFailure = diagnostics(error);
+        // Preserve the known read failure even if recording it also fails.
+        readbackFailure = diagnostics(error);
         await onEvent({ stage: 'readback-failed', reviewSha256: review.reviewSha256,
           code: error.code ?? 'READBACK_INCOMPLETE', readbackFailure });
         throw Object.assign(new Error('write outcome unresolved; inspect journal and read back without resending'),
@@ -155,8 +156,8 @@ export async function applyEnvironmentProfileWrite({ access, review, approval, a
     // Includes durable-event failures after invocation: do not turn missing
     // evidence into a claim that no write occurred or make the old review retryable.
     throw Object.assign(new Error('write or its evidence is unresolved; preserve the journal and verify without resending'),
-      { code: 'PROFILE_WRITE_OUTCOME_UNRESOLVED', uncertainWrite: true, cause: error, ...diagnostics(error),
+      { code: 'PROFILE_WRITE_OUTCOME_UNRESOLVED', uncertainWrite: true, cause: error, ...(readbackFailure ?? diagnostics(error)),
         ...(writeFailure === undefined ? {} : { writeFailure }),
-        ...(error.readbackFailure === undefined ? {} : { readbackFailure: error.readbackFailure }) });
+        ...(readbackFailure === undefined ? {} : { readbackFailure }) });
   }
 }
