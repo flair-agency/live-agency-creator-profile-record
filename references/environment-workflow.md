@@ -130,6 +130,17 @@ an authenticated approval store or a lock shared by other installations.
 Keep the review, approval reference, journal and result together outside Git.
 
 The Skill verifies the result with fresh scoped history and attachment hashes.
+Preparation and the final prewrite check still require current due membership
+for a due-mode plan, alongside the exact plan hash and environment selection.
+Post-write and standalone `verify` instead reconcile the original reviewed
+manifest and observations: a successful record may remove its creator from the
+due view, so continued due membership is not a completion condition. The
+manifest's mode and creator IDs are preserved. Creator existence, account
+identity and uniqueness, selected history scope, stored values and avatar hashes
+must still pass; missing effects or identity changes remain unresolved. For
+example, a matching new profile and avatar can verify after the creator leaves
+the due view, while an absent avatar still requires recovery. This readback path
+does not authorize preparing or applying a write with stale due membership.
 Only these reads may repeat, using the existing bounded readback sequence.
 `businessWorkflowVerified: true` means the approved observations are accounted
 for in those reads. It does not independently prove the source observation or

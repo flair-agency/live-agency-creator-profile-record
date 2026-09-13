@@ -111,9 +111,9 @@ export async function acceptEnvironmentObservations({ access, targets, handoff, 
   return validateProfileObservations(reply.result.output);
 }
 
-function targetIssues(manifest, output) {
+function targetIssues(manifest, output, requireDueMembership) {
   check(Array.isArray(output.creators), 'creator result is invalid');
-  if (manifest.targetMode === 'due') check(Array.isArray(output.dueCreatorRecordIds), 'due membership is required');
+  if (requireDueMembership) check(Array.isArray(output.dueCreatorRecordIds), 'due membership is required');
   const byId = new Map(output.creators.map(row => [row.creatorRecordId, row]));
   const dueIds = new Set(output.dueCreatorRecordIds ?? []);
   const counts = new Map();
@@ -128,7 +128,7 @@ function targetIssues(manifest, output) {
     const reason = !current ? 'creator_record_missing'
       : normalizeAccountKey(current.accountKey) !== expected ? 'creator_account_changed'
       : counts.get(expected) !== 1 ? 'creator_account_not_unique'
-      : manifest.targetMode === 'due' && !dueIds.has(row.creatorRecordId) ? 'not_in_due_view' : null;
+      : requireDueMembership && !dueIds.has(row.creatorRecordId) ? 'not_in_due_view' : null;
     if (reason) issues.push({ creatorRecordId: row.creatorRecordId, reason });
   }
   return issues;
@@ -156,7 +156,17 @@ function normalizedHistory(rows, manifest) {
   return rows;
 }
 
-export async function prepareEnvironmentProfilePlan({ access, targets, observations, nowMs = Date.now() }) {
+export async function prepareEnvironmentProfilePlan(input) {
+  return buildEnvironmentProfileReceipt(input, true);
+}
+
+// Readback checks the original targets and observations. Successful effects can
+// remove a creator from due selection; that predicate only gates a future write.
+export async function readEnvironmentProfileEffects(input) {
+  return buildEnvironmentProfileReceipt(input, false);
+}
+
+async function buildEnvironmentProfileReceipt({ access, targets, observations, nowMs = Date.now() }, planning) {
   const manifest = validateTargets(access, targets);
   validateProfileObservations(observations);
   for (const creator of observations.creators) {
@@ -178,8 +188,9 @@ export async function prepareEnvironmentProfilePlan({ access, targets, observati
         'avatar file differs from observation metadata');
     } finally { await file.close(); }
   }
-  const creators = await read(access, { operation: 'read-creators', includeDueMembership: manifest.targetMode === 'due' });
-  const issues = targetIssues(manifest, creators.result.output);
+  const requireDueMembership = planning && manifest.targetMode === 'due';
+  const creators = await read(access, { operation: 'read-creators', includeDueMembership: requireDueMembership });
+  const issues = targetIssues(manifest, creators.result.output, requireDueMembership);
   // Always bind the history read to selected creators; never widen an empty list.
   const history = manifest.rows.length ? await read(access, { operation: 'read-profile-history',
     creatorRecordIds: manifest.rows.map(row => row.creatorRecordId) }) : null;
