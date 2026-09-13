@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { validateProviderResult } from '@flair-agency/provider-protocol';
-import { prepareEnvironmentProfilePlan } from './profile-environment.mjs';
+import { prepareEnvironmentProfilePlan, readEnvironmentProfileEffects } from './profile-environment.mjs';
 import { sha256Json, validateProfileSyncPlan, planIsBlocked } from './profile-plan.mjs';
 
 const CAPABILITY = 'creator-profile-datastore-write/v1';
@@ -75,7 +75,10 @@ function validateReview(access, review) {
 
 export async function verifyEnvironmentProfileWrite({ access, review }) {
   validateReview(access, review);
-  const receipt = await freshPlan(access, review.planningReceipt);
+  const plan = review.planningReceipt.plan;
+  const receipt = await readEnvironmentProfileEffects({ access,
+    targets: { version: 1, selection: review.selection, manifest: plan.inputs.manifest },
+    observations: plan.inputs.observations, nowMs: plan.builtAtMs });
   const verified = !planIsBlocked(receipt.plan) && receipt.plan.summary.profileCreateCount === 0
     && receipt.plan.summary.profileAttachExistingCount === 0;
   return { status: verified ? 'verified' : 'unresolved', verified, businessWorkflowVerified: verified,
