@@ -1,9 +1,11 @@
 # Profile recording through a selected environment
 
 This is the environment connection for the recording Skill.
-It prepares and applies reviewed business plans. Service acquisition,
-field mapping, credentials and resource selection belong to the selected
-Providers. The Runtime supplies access to those Providers. The Skill owns the
+It prepares and applies reviewed business plans. The selected Providers own
+service acquisition and operations. The selected private environment supplies
+resource, field-binding and credential references; those references do not make
+the Provider the owner of the logical business schema or its meaning. The Runtime
+supplies access to those Providers. The Skill owns the
 target manifest, observation validation, approval and reconciliation decisions.
 The CLI is an operator entry point: run its apply command only after obtaining
 the owner's actual approval of the displayed plan and counts.
@@ -128,6 +130,10 @@ be private and owner-controlled; each review gets an exclusively created file.
 Reusing that file is rejected before another mutation. This local guard is not
 an authenticated approval store or a lock shared by other installations.
 Keep the review, approval reference, journal and result together outside Git.
+Also retain the original avatar files referenced by the review's observations,
+at the same absolute paths with the same bytes and owner-only regular-file
+permissions. Both planning and read-only `verify` validate those files' ownership,
+size and SHA-256; remote attachment hashes alone do not replace them.
 
 The Skill verifies the result with fresh scoped history and attachment hashes.
 Preparation and the final prewrite check still require current due membership
@@ -157,6 +163,11 @@ node scripts/profile_environment.mjs verify --environment /private/environment.j
 If effects remain missing, inspect the journal and prepare a new plan for the
 remainder. Obtain approval for that new plan before execution. Do not delete a
 journal, change journal directories or resend the old review to bypass recovery.
+If an original avatar file is missing or changed, restore the original bytes at
+the referenced path with the required permissions before retrying verification.
+If that is not possible, preserve the unresolved result and involve the authorized
+operator; do not edit the old review's image metadata or repeat the write. The
+current verification path cannot complete without those originals.
 
 # Failure and human takeover
 
@@ -190,6 +201,7 @@ switch endpoints, credentials, environments or the legacy writer.
 A human can inspect the manifest and normalized observations, use the selected
 Provider instructions to obtain the same normalized history, and reproduce the
 business result with the exported `buildProfileSyncPlanFromHistory` function.
+The function is available from `@flair-agency/creator-profile-record/profile-plan`.
 Read `plan.summary` and `plan.operations` to explain proposed effects and stop
 reasons. This source comparison is not a completed human takeover exercise.
 
