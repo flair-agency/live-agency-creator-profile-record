@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { PROFILE_TARGET_INPUT_KIND, sha256Json } from '../../src/profile-plan.mjs';
 
@@ -58,7 +59,76 @@ export async function runHostComparison(argv) {
   return summary(state);
 }
 
+const STAGES = new Set(['S1', 'S2', 'S3', 'S4']);
+const shortDelay = () => new Promise(resolve => setTimeout(resolve, 25));
+const assetFor = row => Buffer.from(`synthetic-asset:${row.creatorRecordId}\n`.repeat(128));
+const digest = value => createHash('sha256').update(value).digest('hex');
+const longHistory = 'synthetic prior progress: no external source, no production data. '.repeat(180);
+
+function stageSummary(state, extra = {}) {
+  check(state.version === 1 && state.fixtureRowsSha256 === EXPECTED_ROWS_SHA256, 'unexpected fixture');
+  check(sha256Json(fixture.manifest.rows) === EXPECTED_ROWS_SHA256, 'fixture hash mismatch');
+  check(new Set(state.saved.map(row => row.creatorRecordId)).size === state.saved.length, 'duplicate saved target');
+  const completedIds = state.saved.map(row => row.creatorRecordId);
+  return { stage: state.stage, fixtureRowsSha256: state.fixtureRowsSha256, savedCount: completedIds.length,
+    partialCount: state.partialIds.length, pendingCount: rows.length - completedIds.length,
+    completedIds, stepCount: state.stepCount, terminal: completedIds.length === rows.length ? 'complete' : 'continuation_required', ...extra };
+}
+
+export async function runHostStage(argv) {
+  const [operation, directory, stage] = argv;
+  check(directory && ['stage-init', 'stage-step', 'stage-status'].includes(operation), 'usage: stage-init DIRECTORY S1..S4; stage-step|stage-status DIRECTORY');
+  if (operation === 'stage-init') {
+    check(STAGES.has(stage), 'stage must be S1..S4');
+    check(sha256Json(fixture.manifest.rows) === EXPECTED_ROWS_SHA256, 'fixture hash mismatch');
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    const state = { version: 1, fixtureRowsSha256: EXPECTED_ROWS_SHA256, stage, saved: [], partialIds: [], stepCount: 0 };
+    await atomicJson(stateFile(directory), state);
+    return stageSummary(state, stage === 'S4' ? { syntheticPriorHistory: longHistory } : {});
+  }
+  const state = await readState(directory);
+  check(STAGES.has(state.stage) && Array.isArray(state.partialIds) && Number.isInteger(state.stepCount), 'invalid staged state');
+  if (operation === 'stage-status') return stageSummary(state);
+  check(state.version === 1 && state.fixtureRowsSha256 === EXPECTED_ROWS_SHA256, 'unexpected fixture');
+  check(new Set(state.saved.map(row => row.creatorRecordId)).size === state.saved.length, 'duplicate saved target');
+  const completed = new Set(state.saved.map(row => row.creatorRecordId));
+  // An S2+ partial target is intentionally retried only after unaffected targets.
+  const target = rows.find(row => !completed.has(row.creatorRecordId) && !state.partialIds.includes(row.creatorRecordId))
+    ?? rows.find(row => !completed.has(row.creatorRecordId));
+  if (!target) return stageSummary(state);
+  state.stepCount++;
+  const response = { targetId: target.creatorRecordId, transition: [] };
+  if (state.stage === 'S4') {
+    response.transition.push('navigate', 'wait');
+    await shortDelay();
+    response.transition.push('ready');
+  } else if (state.stage === 'S1') await shortDelay();
+  if ((state.stage === 'S2' || state.stage === 'S3' || state.stage === 'S4')
+    && target.creatorRecordId === rows[5].creatorRecordId && !state.partialIds.includes(target.creatorRecordId)) {
+    state.partialIds.push(target.creatorRecordId);
+    response.result = 'partial';
+    response.readback = { savedCount: state.saved.length, partialCount: state.partialIds.length };
+    await atomicJson(stateFile(directory), state);
+    return stageSummary(state, response);
+  }
+  state.saved.push(target);
+  response.result = 'saved';
+  if (state.stage === 'S3' || state.stage === 'S4') {
+    const asset = assetFor(target);
+    response.asset = { size: asset.length, sha256: digest(asset) };
+    response.syntheticPayload = `${target.accountKey}:`.padEnd(2048, 'x');
+  }
+  response.readback = { savedCount: state.saved.length, partialCount: state.partialIds.length };
+  if (state.stage === 'S4') response.transition.push('extract', 'readback');
+  await atomicJson(stateFile(directory), state);
+  return stageSummary(state, response);
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
-  try { console.log(JSON.stringify(await runHostComparison(process.argv.slice(2)))); }
+  try {
+    const argv = process.argv.slice(2);
+    const result = argv[0]?.startsWith('stage-') ? await runHostStage(argv) : await runHostComparison(argv);
+    console.log(JSON.stringify(result));
+  }
   catch (error) { console.error(JSON.stringify({ status: 'stopped', message: error.message })); process.exitCode = 2; }
 }
