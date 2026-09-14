@@ -142,6 +142,30 @@ preparation through planning; pending actual plan approval is a separate gate.
 Business completion still requires the readback below. Report these stages
 separately instead of calling saved observations registered or verified.
 
+## Host continuation prototype
+
+`src/profile-continuation.mjs` is a deterministic, source-neutral prototype for
+a selected host integration. It consumes the same saved targets and progress,
+processes a bounded number of rows, and returns `continuation_required` if the
+host ends before a result is saved. A subsequent host invocation supplies that
+returned progress and resumes with the original first unfinished row. Completed
+results remain immutable, while a target-local `partial` or `blocked` result can
+be replaced only by a later final result for the same manifest identity.
+
+The module is intentionally not an autonomous scheduler: it does not start a
+browser, call a model, create a task, or run a timer. A host integration must
+explicitly dispatch each next bounded turn and retain the existing unattended-
+source, session, rate-limit, authority, and no-write gates. The synthetic
+continuation test proves state transitions through a simulated `final_answer` /
+`task_complete` boundary and 20-target completion; it does not prove that a live
+host or model will avoid early final answers.
+
+The paired synthetic comparison keeps the host `turn_ended` signal fixed while
+varying a baseline and a strengthened continuation instruction. Both require a
+new host invocation and retain all 20 rows. It is a negative-control contract
+test, not a measurement of an LLM's instruction-following rate; run a separately
+authorized live-host experiment before claiming a prompt effect.
+
 # Decisions and output
 
 Planning rereads creator identity and due membership when applicable. It always

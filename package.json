@@ -8,6 +8,7 @@
     "./contracts": "./src/contracts.mjs",
     "./environment": "./src/profile-environment.mjs",
     "./execution": "./src/profile-execution.mjs",
+    "./continuation": "./src/profile-continuation.mjs",
     "./profile-plan": "./src/profile-plan.mjs",
     "./scripts/profile_environment": "./scripts/profile_environment.mjs"
   },
