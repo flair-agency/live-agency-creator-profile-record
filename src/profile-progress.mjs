@@ -22,8 +22,6 @@ function validateResult(targets, result) {
   }
   if (result.status === 'completed') {
     check(result.observation && result.evidenceRefs.length > 0, 'completed acquisition needs normalized observation and evidence references');
-    const blockers = new Set(['account_mismatch', 'authentication_required', 'blocked', 'schema_changed']);
-    check(!Object.entries(result.observation.profile).some(([key, value]) => key.endsWith('Status') && blockers.has(value)), 'source blocker cannot be a completed acquisition');
   }
 }
 

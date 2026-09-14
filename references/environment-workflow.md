@@ -97,8 +97,15 @@ if available. For example, a partial synthetic result is:
 Record a completed result only after checking the observation against its source
 evidence and identity. The helper validates shape and identity, not evidence truth
 or accessibility. A bare image path or an in-memory array cannot satisfy completion.
-Use `blocked` for authentication, ambiguous identity or unsupported source schema;
-unavailable fields remain explicit normalized statuses, never invented values.
+Here `completed` means a saved, validated final observation for an actually
+attempted target, not success of every field. A usable profile with an unavailable
+avatar, or a final observation with no available values, remains eligible for the
+existing business planner's create/unavailable decisions. Field statuses do not
+introduce a new whole-batch stop. Use `blocked` when authentication, ambiguous
+identity or unsupported source schema prevents resolving the target attempt;
+use `partial` when its observation is still unfinished. Preserve unavailable field
+statuses without invented values, and never synthesize final observations for
+untouched targets to satisfy assembly.
 An identical repeated completed result is idempotent; a changed completed result
 is rejected. Partial/blocked results can be replaced after their condition resolves.
 Counts are per unique manifest target, not per attempt, image or browser visit.

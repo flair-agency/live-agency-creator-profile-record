@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { sha256Json, PROFILE_TARGET_INPUT_KIND } from '../src/profile-plan.mjs';
+import { sha256Json, PROFILE_TARGET_INPUT_KIND, buildProfileSyncPlanFromHistory } from '../src/profile-plan.mjs';
 import { createProfileProgress, recordProfileProgress, inspectProfileProgress, assembleProfileObservations } from '../src/profile-progress.mjs';
 
 const at = '2030-01-02T03:04:00Z';
@@ -56,11 +56,27 @@ test('identity, scope drift, duplicate records, bare images and completed rewrit
   assert.throws(() => recordProfileProgress(targets, empty, { ...rows[0], status: 'completed', evidenceRefs: ['/private/avatar.png'] }));
   assert.throws(() => recordProfileProgress(targets, empty, { ...complete(rows[0]), accountKey: rows[1].accountKey }));
   assert.throws(() => recordProfileProgress(targets, empty, { ...complete(rows[0]), observation: complete(rows[1]).observation }));
-  const blocked = complete(rows[0]);
-  blocked.observation.profile.avatarStatus = 'authentication_required';
-  assert.throws(() => recordProfileProgress(targets, empty, blocked));
   const progress = recordProfileProgress(targets, empty, complete(rows[0]));
   assert.throws(() => inspectProfileProgress({ ...targets, selection: { generation: 'b'.repeat(64) } }, progress));
   assert.throws(() => inspectProfileProgress(targets, { ...progress, results: [...progress.results, ...progress.results] }));
   assert.throws(() => recordProfileProgress(targets, progress, { ...complete(rows[0]), evidenceRefs: ['changed'] }));
+});
+
+test('terminal observations preserve existing planner treatment of failed fields and unavailable profiles', () => {
+  const usable = complete(rows[0]);
+  usable.observation.profile.avatarStatus = 'authentication_required';
+  const unavailable = complete(rows[1]);
+  unavailable.observation.profile.followerCount = null;
+  unavailable.observation.profile.followerStatus = 'not_available';
+  let progress = createProfileProgress(targets);
+  for (const result of [usable, unavailable]) progress = recordProfileProgress(targets, progress, result);
+  const assembled = assembleProfileObservations(targets, progress);
+  const args = { manifest: targets.manifest, profileHistory: [], nowMs: Date.parse(at) };
+  const plan = buildProfileSyncPlanFromHistory({ ...args, observations: assembled });
+  const direct = buildProfileSyncPlanFromHistory({ ...args, observations: { observedAt: at, rowCount: 2, creators: [usable.observation, unavailable.observation] } });
+  assert.deepEqual(plan, direct);
+  assert.equal(plan.summary.profileCreateCount, 1);
+  assert.equal(plan.summary.profileUnavailableCount, 1);
+  assert.equal(plan.summary.targetIssueCount, 0);
+  assert.equal(inspectProfileProgress(targets, progress).counts.completed, 2);
 });
