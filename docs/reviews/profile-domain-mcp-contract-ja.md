@@ -1,13 +1,15 @@
 ---
 type: review
-visibility: private
-status: pending
+visibility: public
+status: commit
 date: 2026-09-26
-author: "Codex (owner review draft)"
-context: "Profile Pilot #16: owner-approved contract-design investigation"
+author: "Naoki Kimura (owner review); Codex (review draft)"
+context: "Profile Pilot #16 and PR #18 owner review; non-canonical review history"
 ---
 
 # Profile の Skill 向け MCP 境界の要求整理
+
+この文書は owner が確認した日本語レビュー履歴であり、正本ではない。採用された判断の英語正本は [Profile capability boundary for an MCP candidate](../architecture/profile-mcp-boundary.md) に置く。下記の未決事項や合成 PoC の限界は、承認によって本番仕様へ昇格しない。
 
 ## 判断対象
 
@@ -55,4 +57,4 @@ media token や物理フィールドを Skill 向けの自由に再利用でき�
 
 ## AI policy review
 
-文書・Skill 知識方針、言語方針、開発方針および Private Source Integration Guide と照合した。owner review 用の未採択ドラフトとして、業務要求、現行の実現方法、合成 PoC の証拠、未証明の host による承認を分けた。実 resource ID、認証情報、実 creator データ、private の物理 field mapping は記載していない。source と test の対応、失敗時の停止・照合・人への引継ぎ、現行経路の rollback を記した。自己レビューは独立した受入判定ではない。
+文書・Skill 知識方針、言語方針、開発方針および Private Source Integration Guide と照合した。owner review 履歴として、業務要求、現行の実現方法、合成 PoC の証拠、未証明の host による承認を分けた。採用判断は上記の英語正本へ反映し、この日本語文書を競合する正本として扱わない。実 resource ID、認証情報、実 creator データ、private の物理 field mapping は記載していない。source と test の対応、失敗時の停止・照合・人への引継ぎ、現行経路の rollback を記した。自己レビューは独立した受入判定ではない。

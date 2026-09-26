@@ -2,6 +2,10 @@
 
 Independent Skill repository. [SKILL.md](SKILL.md) owns its behavior and acceptance contract.
 
+The owner-adopted [Profile MCP boundary](docs/architecture/profile-mcp-boundary.md)
+records the non-production contract investigation and its limits. It does not
+change the selected Runtime/Provider route or the Skill's current contract.
+
 Run `npm test` after installing the parent development composition. Provider discovery tests select the shared synthetic fixture installation explicitly. This repository owns its source, package manifest and focused tests.
 
 The version 2 archive contains only the selected-environment workflow and neutral
