@@ -56,12 +56,11 @@ async function pilot(t, { loseCreateResponse = false, failUpload = false, avatar
       return { file_token: token };
     }
     if (name === MCP_CREATE) {
+      assert.equal(args.table, 'history');
       const token = args.fields.avatar[0].file_token;
       assert.equal(state.uploads.get(token), avatar.sha256, 'create must use the uploaded avatar');
       assert.equal(state.history.length, 0, 'uncertain creates must not be replayed');
-      state.history.push({ record_id: HISTORY, fields: {
-        creator: CREATOR, observedAt: NOW, followers: 42, avatar: [{ file_token: token }],
-      } });
+      state.history.push({ record_id: HISTORY, fields: structuredClone(args.fields) });
       state.due = [];
       if (loseCreateResponse) throw Object.assign(new Error('synthetic response lost'), { code: 'RESPONSE_LOST' });
       return { record_id: HISTORY };
@@ -158,6 +157,13 @@ for (const scenario of [
     const candidateResult = await candidateDomainOperation(candidate);
     assert.equal(candidateResult.status === 'completed', currentResult.status === 'success');
     assert.deepEqual(candidate.state.history, retained.state.history);
+    for (const f of [candidate, retained]) {
+      const create = f.state.toolCalls.find(call => call.name === MCP_CREATE);
+      if (!scenario.failUpload) assert.deepEqual(create.args, { table: 'history', fields: {
+        creator: CREATOR, observedAt: NOW, followers: 42,
+        avatar: [{ file_token: 'synthetic-avatar-token' }],
+      } });
+    }
     assert.deepEqual(candidate.state.toolCalls.filter(call => [AVATAR_UPLOAD, MCP_CREATE].includes(call.name))
       .map(call => call.name), retained.state.toolCalls.filter(call => [AVATAR_UPLOAD, MCP_CREATE].includes(call.name))
       .map(call => call.name));
