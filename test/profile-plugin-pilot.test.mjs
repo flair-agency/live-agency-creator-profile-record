@@ -15,8 +15,8 @@ import { sha256Json } from '../src/profile-plan.mjs';
 const NOW = Date.parse('2030-01-02T03:04:00Z');
 const CREATOR = 'recSyntheticPilotCreator001';
 const HISTORY = 'recSyntheticPilotHistory001';
-const MCP_SEARCH = 'bitable.v1.appTableRecord.search';
-const MCP_CREATE = 'bitable.v1.appTableRecord.create';
+const MCP_SEARCH = 'bitable_v1_appTableRecord_search';
+const MCP_CREATE = 'bitable_v1_appTableRecord_create';
 // This is a synthetic-only candidate adapter, not a tool in Lark MCP 0.5.1.
 const AVATAR_UPLOAD = 'pilot.synthetic.avatar.uploadBeforeCreate';
 
