@@ -51,7 +51,7 @@ media token や物理フィールドを Skill 向けの自由に再利用でき�
 
 推奨は、業務要求と必要な保証を上の表で確認したうえで、現行の選択済み Profile datastore capability を比較対象に、最小の MCP 操作を合成入力で試すこと。正式な tool の粒度、承認方法、結果証拠と composition owner は、選択された host と比較結果を受けて決める。現行 Runtime／Provider と `creator-profile-datastore-write/v1` は引き続き選択経路であり、移管・廃止・本番導入は別判断とする。
 
-本ドラフトを取り消すには、この文書だけを戻す。合成比較は実サービスに書き込まない。資格ある担当者は現行 Skill 手順、計画と journal、Provider の読取り経路から安全な再開点を判断できる必要がある。候補 MCP の receipt がそれと同等かは未検証である。
+本ドラフトを取り消すには、この文書だけを戻す。合成比較は実サービスに書き込まない。資格ある担当者は現行経路では Skill 手順、計画と journal、Provider の読取りから安全な再開点を判断できる。候補経路でも人が結果と安全な次の操作を判断できる必要があるが、証拠の形式を現行 journal や receipt と同じにする必要はない。
 
 ## AI policy review
 
