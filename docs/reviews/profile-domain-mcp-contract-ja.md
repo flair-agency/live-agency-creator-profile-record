@@ -45,7 +45,7 @@ media token は選択された書込み実装内で正確な create に使い、
 
 ## 判断と回復経路
 
-推奨は、Skill の業務計画と承認を残し、現行の選択済み Profile datastore capability の意味を出発点に、上記の有界な MCP 操作をドラフト化して合成比較すること。正式な tool 名・引数・承認証跡・composition owner は、比較結果と選択されたホストの証拠を受けて別途確定する。現行 Runtime／Provider と `record-dataset-write/v1` は引き続き選択経路であり、移管・廃止・本番導入は別判断とする。
+推奨は、Skill の業務計画と承認を残し、現行の選択済み Profile datastore capability の意味を出発点に、上記の有界な MCP 操作をドラフト化して合成比較すること。正式な tool 名・引数・承認証跡・composition owner は、比較結果と選択されたホストの証拠を受けて別途確定する。現行 Runtime／Provider と `creator-profile-datastore-write/v1` は引き続き選択経路であり、移管・廃止・本番導入は別判断とする。
 
 本ドラフトを取り消すには、この文書だけを戻す。合成比較は実サービスに書き込まない。資格ある担当者は現行 Skill 手順、計画と journal、Provider の読取り経路から安全な再開点を判断できる必要がある。候補 MCP の receipt がそれと同等かは未検証である。
 
