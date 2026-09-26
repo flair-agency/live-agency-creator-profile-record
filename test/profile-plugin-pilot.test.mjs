@@ -20,11 +20,11 @@ const MCP_CREATE = 'bitable_v1_appTableRecord_create';
 // This is a synthetic-only candidate adapter, not a tool in Lark MCP 0.5.1.
 const AVATAR_UPLOAD = 'pilot.synthetic.avatar.uploadBeforeCreate';
 
-async function pilot(t, { loseCreateResponse = false, failUpload = false } = {}) {
+async function pilot(t, { loseCreateResponse = false, failUpload = false, avatarPath } = {}) {
   const directory = await mkdtemp(path.join(tmpdir(), 'profile-plugin-pilot-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const bytes = Buffer.from('synthetic-profile-avatar');
-  const avatar = { path: path.join(directory, 'avatar.png'), name: 'avatar.png',
+  const avatar = { path: avatarPath ?? path.join(directory, 'avatar.png'), name: 'avatar.png',
     mimeType: 'image/png', size: bytes.length,
     sha256: createHash('sha256').update(bytes).digest('hex') };
   await writeFile(avatar.path, bytes, { mode: 0o600 });
@@ -112,7 +112,58 @@ async function pilot(t, { loseCreateResponse = false, failUpload = false } = {})
   const apply = () => applyEnvironmentProfileWrite({ access, review, approval,
     authorize: async () => true, onEvent: async event => { state.events.push(event); },
     sleep: async () => {} });
-  return { access, state, review, apply };
+  return { access, state, review, apply, callTool, observations, targets, avatar };
+}
+
+// This is a candidate domain-operation composition over the same synthetic lower
+// effects. The parent PoC separately proves MCP transport; this comparison does
+// not claim to exercise a Plugin host or select this tool boundary.
+async function candidateDomainOperation(f) {
+  const creator = f.observations.creators[0];
+  assert.equal(creator.creatorRecordId, f.targets.manifest.rows[0].creatorRecordId);
+  assert.equal(creator.profile.avatar.sha256, f.avatar.sha256);
+  const prior = await f.callTool(MCP_SEARCH, { table: 'history', creator: creator.creatorRecordId });
+  if (prior.length) return { status: 'unknown', reason: 'existing_row_requires_reconciliation' };
+  let token;
+  try { token = (await f.callTool(AVATAR_UPLOAD, f.avatar)).file_token; }
+  catch { return { status: 'unknown', stage: 'upload' }; }
+  try {
+    await f.callTool(MCP_CREATE, { table: 'history', fields: {
+      creator: creator.creatorRecordId, observedAt: Date.parse(creator.observedAt),
+      followers: creator.profile.followerCount, avatar: [{ file_token: token }],
+    } });
+  } catch { /* The create may have succeeded; only readback can decide. */ }
+  const rows = await f.callTool(MCP_SEARCH, { table: 'history', creator: creator.creatorRecordId });
+  if (rows.length !== 1 || rows[0].fields.creator !== creator.creatorRecordId
+    || rows[0].fields.followers !== creator.profile.followerCount
+    || rows[0].fields.observedAt !== Date.parse(creator.observedAt)
+    || f.state.uploads.get(rows[0].fields.avatar?.[0]?.file_token) !== f.avatar.sha256) {
+    return { status: 'unknown', stage: 'readback' };
+  }
+  return { status: 'completed', recordId: rows[0].record_id };
+}
+
+for (const scenario of [
+  { name: 'normal create' },
+  { name: 'lost create response', loseCreateResponse: true },
+  { name: 'failed upload', failUpload: true },
+]) {
+  test(`same-input synthetic outcome: ${scenario.name}`, async t => {
+    const retained = await pilot(t, scenario);
+    const candidate = await pilot(t, { ...scenario, avatarPath: retained.avatar.path });
+    assert.deepEqual(candidate.observations, retained.observations);
+    assert.deepEqual(candidate.targets.manifest, retained.targets.manifest);
+    assert.equal(candidate.avatar.sha256, retained.avatar.sha256);
+    const currentResult = await retained.apply();
+    const candidateResult = await candidateDomainOperation(candidate);
+    assert.equal(candidateResult.status === 'completed', currentResult.status === 'success');
+    assert.deepEqual(candidate.state.history, retained.state.history);
+    assert.deepEqual(candidate.state.toolCalls.filter(call => [AVATAR_UPLOAD, MCP_CREATE].includes(call.name))
+      .map(call => call.name), retained.state.toolCalls.filter(call => [AVATAR_UPLOAD, MCP_CREATE].includes(call.name))
+      .map(call => call.name));
+    assert.equal(candidate.state.toolCalls.filter(call => call.name === MCP_CREATE).length,
+      retained.state.toolCalls.filter(call => call.name === MCP_CREATE).length);
+  });
 }
 
 test('synthetic Profile pilot uploads an avatar before creating history and verifies readback', async t => {
