@@ -43,6 +43,15 @@ field-validated identities and due membership; the Skill preserves their order,
 normalizes account keys, and rejects duplicate or missing target identities.
 Keep targets, observations, reviews, images and results private and outside Git.
 
+Persist each creator's normalized result and identity-bound evidence references
+before moving to the next creator; do not retain the only copy in conversation
+or a live interpreter. Use the local [acquisition checkpoints](references/environment-workflow.md#acquisition-checkpoints-and-continuation)
+to resume the saved manifest and derive counts. An avatar file alone is not a
+completed observation. Continue the remaining authorized targets after a single
+creator completes; a progress update is not a terminal result. Stop only the
+affected operation when its evidence or authority is missing, and preserve the
+specific blocker. Do not restart the whole manifest after an interruption.
+
 ## Reconciliation
 
 - Require one observation for every manifest row and no extras after account

@@ -67,6 +67,81 @@ plan command. Runtime correlation validation does not prove source evidence;
 the operator still verifies identities and visible evidence. Explicitly supplied
 normalized observations remain supported without inventing Provider provenance.
 
+# Acquisition checkpoints and continuation
+
+Keep the saved targets and source handoff unchanged during one acquisition. Use
+`scripts/profile_progress.mjs` to save progress in an existing owner-only directory
+outside Git. This local helper reuses the private atomic-file writer and syncs the
+directory after each checkpoint. It never opens a source session, accepts a source
+result envelope, plans a write or grants authority. It binds progress to the entire
+saved target receipt, including environment selection; changed targets require a
+new progress file and explicit evidence review rather than automatic reuse.
+
+```sh
+node scripts/profile_progress.mjs init /private/targets.json /private/progress.json
+node scripts/profile_progress.mjs record /private/targets.json /private/progress.json /private/creator-result.json
+node scripts/profile_progress.mjs status /private/targets.json /private/progress.json
+node scripts/profile_progress.mjs assemble /private/targets.json /private/progress.json /private/observations.json
+```
+
+Each private result has `creatorRecordId`, `accountKey`, `status`, `evidenceRefs`
+(private evidence locations or identifiers), and, for `completed`, `observation`
+containing one complete creator object from the normalized observation schema.
+`partial` and `blocked` require a `reason`; they may retain a normalized observation
+if available. For example, a partial synthetic result is:
+
+```json
+{"creatorRecordId":"recSyntheticA001","accountKey":"synthetic.a","status":"partial","evidenceRefs":["private-evidence:synthetic-a"],"reason":"Normalized observation not yet complete"}
+```
+
+Record a completed result only after checking the observation against its source
+evidence and identity. The helper validates shape and identity, not evidence truth
+or accessibility. A bare image path or an in-memory array cannot satisfy completion.
+Here `completed` means a saved, validated final observation for an actually
+attempted target, not success of every field. A usable profile with an unavailable
+avatar, or a final observation with no available values, remains eligible for the
+existing business planner's create/unavailable decisions. Field statuses do not
+introduce a new whole-batch stop. Use `blocked` when authentication, ambiguous
+identity or unsupported source schema prevents resolving the target attempt;
+use `partial` when its observation is still unfinished. Preserve unavailable field
+statuses without invented values, and never synthesize final observations for
+untouched targets to satisfy assembly.
+An identical repeated completed result is idempotent; a changed completed result
+is rejected. Partial/blocked results can be replaced after their condition resolves.
+Counts are per unique manifest target, not per attempt, image or browser visit.
+
+After each target, save its result before continuing. On restart, run `status`
+and inspect saved `remaining` identities and their partial/blocked reasons. Resume
+only missing work under the same authority and source instructions. A target-local
+problem does not stop independent authorized targets; a session-wide authority or
+authentication failure stops acquisition using that session. The unattended-source
+support gate still applies. Do not retry a blocker blindly or stop just because
+the first target completed or a tool cycle ended.
+
+Commands serialize access with an exclusive `.lock` file. A terminated process may
+leave that lock: first establish that its process has stopped, preserve and inspect
+the saved progress, then remove only the stale lock and run `status`. Do not remove
+a live lock or edit a completed result. Atomic replacement preserves the prior or
+new complete checkpoint on process interruption; unsaved work must be reacquired.
+If a checkpoint is corrupt or unavailable, report the uncertainty rather than
+reconstructing success from screenshots or filenames.
+
+`assemble` requires completed observations for every original manifest row and
+preserves manifest order. For an instruction-result route, use those saved rows
+in the original correlated result and retain the existing `--handoff` and
+`--source-result` validation; assembling rows does not supply Provider provenance.
+For explicitly supplied normalized input, use the existing `--observations` path.
+Do not drop blocked rows, weaken full-manifest validation or split an approved plan.
+
+Acquisition is complete only when every target has a saved normalized observation;
+this is not registration completion. Otherwise the terminal report is partial or
+blocked and names the exact remaining targets, reasons, saved files and resumption
+step. Derive acquisition counts from `status`, plan counts from the saved plan and
+write/verification counts from the saved result and journal. Continue authorized
+preparation through planning; pending actual plan approval is a separate gate.
+Business completion still requires the readback below. Report these stages
+separately instead of calling saved observations registered or verified.
+
 # Decisions and output
 
 Planning rereads creator identity and due membership when applicable. It always
